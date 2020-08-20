@@ -351,7 +351,7 @@ class CPU:
 
         elif self.op == Op.LDBCD:
             # store Vx in I, I+1, and I+2 in BCD format
-            h, t, o = self.bcd(self.v[x])
+            h, t, o = CPU.bcd(self.v[x])
             memory.write8(self.i, h)
             memory.write8(self.i + 1, t)
             memory.write8(self.i + 2, o)
@@ -379,7 +379,8 @@ class CPU:
         return True
 
     # turns value into a 3-byte BCD representation
-    def bcd(self, value):
+    @staticmethod
+    def bcd(value):
         hundreds = value // 100
         tens = (value - (hundreds * 100)) // 10
         ones = value % 10

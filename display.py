@@ -26,32 +26,6 @@ class Pixel:
         self.state = 0  # initialize to black
         self.on_color = on_color
 
-    # @property
-    # def x(self):
-    #     return self._x
-    #
-    # @x.setter
-    # def x(self, x):
-    #     if 0 <= x < NATIVE_WIDTH:
-    #         self._x = x
-    #     elif x < 0:
-    #         self._x = 0
-    #     else:
-    #         self._x = NATIVE_WIDTH - 1
-    #
-    # @property
-    # def y(self):
-    #     return self._y
-    #
-    # @y.setter
-    # def y(self, y):
-    #     if 0 <= y < NATIVE_HEIGHT:
-    #         self._y = y
-    #     elif y < 0:
-    #         self._y = 0
-    #     else:
-    #         self._y = NATIVE_HEIGHT - 1
-
     def set(self):
         self.state = 1
 
@@ -69,57 +43,73 @@ class Pixel:
         pygame.draw.rect(screen, self.on_color if self.state else BLACK, self.rect)
 
 
-def create_pixels(width, height):
-    pixels = []
-    for x in range(width):
-        pixels.append([])
-        for y in range(height):
-            pixels[x].append(Pixel(x, y))
-
-    return pixels
-
-
-def draw_sprite(start_x, start_y, sprite, pixels):
-    for x in range(4):
-        px = x + start_x
-        if px >= len(pixels): break # stop if we go off the screen
-        for y in range(len(sprite)):
-            py = y + start_y
-            if py >= len(pixels[px]): break # stop if we go off the screen
-
-            p = pixels[x+start_x][y+start_y]
-            sprite_bit = (sprite[y] >> (7 - x)) & 0x1
-            if p.state ^ sprite_bit == 0:
-                # set the collision flag
-                pass
-                # vf = 1
-            p.state |= sprite_bit
-
-
 class Display:
 
-    def __init__(self, width, height, scale_factor=SCALE_FACTOR):
+    def __init__(self, width, height, screen, scale_factor=SCALE_FACTOR):
         self.width = width
         self.height = height
+        self.screen = screen
         self.scale_factor = scale_factor
-        self.pixels = create_pixels(self.width, self.height)
+        self.pixels = self.create_pixels()
 
+    def get_pixel(self, x, y):
+        if 0 <= x < self.width:
+            if 0 <= y < self.height:
+                return self.pixels[x][y]
+            else:
+                print(f"Invalid y coord of {y} (max is {self.height - 1})")
+        else:
+            print(f"Invalid x coord of {x} (max is {self.width -1})")
+
+    # Draw the given sprite to the screen starting at the given x and y coordinates
+    # The sprite is a list of bytes, the upper nibble of each contains the sprite info
     def draw_sprite(self, start_x, start_y, sprite):
         collision = 0
         for x in range(4):
             px = x + start_x
-            if px >= len(self.pixels): break  # stop if we go off the screen
+
+            if px >= self.width:
+                # wrap around if we go off screen
+                px -= self.width
+
             for y in range(len(sprite)):
                 py = y + start_y
-                if py >= len(self.pixels[px]): break  # stop if we go off the screen
 
-                p = self.pixels[x + start_x][y + start_y]
+                if py >= len(self.pixels[px]):
+                    # wrap around if we go off screen
+                    py -= self.height
+
+                p = self.pixels[px][py]
                 sprite_bit = (sprite[y] >> (7 - x)) & 0x1
-                if p.state ^ sprite_bit == 0:
+
+                new_state = p.state ^ sprite_bit
+                if p.state == 1 and new_state == 0:
+                    # print(f"Collision! (x={x}, y={y})")
                     collision = 1
 
-                p.state |= sprite_bit
+                p.state = new_state
+
         return collision
+
+    def draw_all(self):
+        for col in self.pixels:
+            for p in col:
+                p.draw(self.screen)
+
+    def clear(self):
+        for col in self.pixels:
+            for p in col:
+                p.set_color(WHITE)
+                p.clear()
+
+    def create_pixels(self):
+        pixels = []
+        for x in range(self.width):
+            pixels.append([])
+            for y in range(self.height):
+                pixels[x].append(Pixel(x, y))
+
+        return pixels
 
 
 def main():
@@ -129,7 +119,7 @@ def main():
     done = False
     clock = pygame.time.Clock()
 
-    my_display = Display(NATIVE_WIDTH, NATIVE_HEIGHT)
+    my_display = Display(NATIVE_WIDTH, NATIVE_HEIGHT, screen)
 
     dx, dy = 0, 0
 
@@ -149,53 +139,49 @@ def main():
             if event.type == pygame.KEYDOWN:
                 # print(f"KEY {event.key} pressed down")
                 # Draw the sprite of the key pressed at the current location of the mouse
-                if event.key == pygame.K_0: draw_sprite(px, py, CHIP8_SPRITES['0'], pixels)
-                elif event.key == pygame.K_1: draw_sprite(px, py, CHIP8_SPRITES['1'], pixels)
-                elif event.key == pygame.K_2: draw_sprite(px, py, CHIP8_SPRITES['2'], pixels)
-                elif event.key == pygame.K_3: draw_sprite(px, py, CHIP8_SPRITES['3'], pixels)
+                if event.key == pygame.K_0: my_display.draw_sprite(px, py, CHIP8_SPRITES['0'])
+                elif event.key == pygame.K_1: my_display.draw_sprite(px, py, CHIP8_SPRITES['1'])
+                elif event.key == pygame.K_2: my_display.draw_sprite(px, py, CHIP8_SPRITES['2'])
+                elif event.key == pygame.K_3: my_display.draw_sprite(px, py, CHIP8_SPRITES['3'])
 
-                elif event.key == pygame.K_4: draw_sprite(px, py, CHIP8_SPRITES['4'], pixels)
-                elif event.key == pygame.K_5: draw_sprite(px, py, CHIP8_SPRITES['5'], pixels)
-                elif event.key == pygame.K_6: draw_sprite(px, py, CHIP8_SPRITES['6'], pixels)
-                elif event.key == pygame.K_7: draw_sprite(px, py, CHIP8_SPRITES['7'], pixels)
+                elif event.key == pygame.K_4: my_display.draw_sprite(px, py, CHIP8_SPRITES['4'])
+                elif event.key == pygame.K_5: my_display.draw_sprite(px, py, CHIP8_SPRITES['5'])
+                elif event.key == pygame.K_6: my_display.draw_sprite(px, py, CHIP8_SPRITES['6'])
+                elif event.key == pygame.K_7: my_display.draw_sprite(px, py, CHIP8_SPRITES['7'])
 
-                elif event.key == pygame.K_8: draw_sprite(px, py, CHIP8_SPRITES['8'], pixels)
-                elif event.key == pygame.K_9: draw_sprite(px, py, CHIP8_SPRITES['9'], pixels)
-                elif event.key == pygame.K_a: draw_sprite(px, py, CHIP8_SPRITES['A'], pixels)
-                elif event.key == pygame.K_b: draw_sprite(px, py, CHIP8_SPRITES['B'], pixels)
+                elif event.key == pygame.K_8: my_display.draw_sprite(px, py, CHIP8_SPRITES['8'])
+                elif event.key == pygame.K_9: my_display.draw_sprite(px, py, CHIP8_SPRITES['9'])
+                elif event.key == pygame.K_a: my_display.draw_sprite(px, py, CHIP8_SPRITES['A'])
+                elif event.key == pygame.K_b: my_display.draw_sprite(px, py, CHIP8_SPRITES['B'])
 
-                elif event.key == pygame.K_c: draw_sprite(px, py, CHIP8_SPRITES['C'], pixels)
-                elif event.key == pygame.K_d: draw_sprite(px, py, CHIP8_SPRITES['D'], pixels)
-                elif event.key == pygame.K_e: draw_sprite(px, py, CHIP8_SPRITES['E'], pixels)
-                elif event.key == pygame.K_f: draw_sprite(px, py, CHIP8_SPRITES['F'], pixels)
-                else: draw_sprite(px, py, CUSTOM_SPRITES['x'], pixels)
+                elif event.key == pygame.K_c: my_display.draw_sprite(px, py, CHIP8_SPRITES['C'])
+                elif event.key == pygame.K_d: my_display.draw_sprite(px, py, CHIP8_SPRITES['D'])
+                elif event.key == pygame.K_e: my_display.draw_sprite(px, py, CHIP8_SPRITES['E'])
+                elif event.key == pygame.K_f: my_display.draw_sprite(px, py, CHIP8_SPRITES['F'])
+                else: my_display.draw_sprite(px, py, CUSTOM_SPRITES['block'])
 
             # process input events
 
         # if event.type == pygame.MOUSEBUTTONDOWN:
         mouse1, mouse2, mouse3 = pygame.mouse.get_pressed()
         if mouse1 or mouse2 or mouse3:
-            p = pixels[px][py]
+            p = my_display.get_pixel(px, py)
 
             # print(f"Mouse button {event.button} pressed")
             if mouse1:
-                p.set_color(WHITE)
-                p.set()
-            elif mouse2:
                 p.set_color(GREEN)
                 p.set()
+                # my_display.draw_sprite(px, py, CUSTOM_SPRITES['pixel'])
+            elif mouse2:
+                my_display.clear()
+                # my_display.draw_sprite(px, py, CUSTOM_SPRITES['pixel'])
             elif mouse3:
                 # p.set_color(GREEN)
                 p.clear()
 
         screen.fill(BLACK)
 
-        for px in range(len(pixels)):
-            for py in range(len(pixels[px])):
-                p = pixels[px][py]
-                # p.x += dx
-                # p.y += dy
-                p.draw(screen)
+        my_display.draw_all()
 
         pygame.display.flip()
         dx, dy = 0, 0
