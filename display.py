@@ -4,8 +4,6 @@ import sys
 from colors import *
 from sprites import *
 
-pygame.init()
-
 SCALE_FACTOR = 10
 NATIVE_WIDTH = 64
 NATIVE_HEIGHT = 32
@@ -45,11 +43,11 @@ class Pixel:
 
 class Display:
 
-    def __init__(self, width, height, screen, scale_factor=SCALE_FACTOR):
+    def __init__(self, width, height, scale_factor=SCALE_FACTOR):
         self.width = width
         self.height = height
-        self.screen = screen
         self.scale_factor = scale_factor
+        self.screen = pygame.display.set_mode((self.width * self.scale_factor, self.height * self.scale_factor))
         self.pixels = self.create_pixels()
 
     def get_pixel(self, x, y):
@@ -60,6 +58,9 @@ class Display:
                 print(f"Invalid y coord of {y} (max is {self.height - 1})")
         else:
             print(f"Invalid x coord of {x} (max is {self.width -1})")
+
+    def get_screen(self):
+        return self.screen
 
     # Draw the given sprite to the screen starting at the given x and y coordinates
     # The sprite is a list of bytes, the upper nibble of each contains the sprite info
@@ -112,16 +113,15 @@ class Display:
         return pixels
 
 
-def main():
-    screen = pygame.display.set_mode(DISPLAY_SIZE)
+def display_test():
+    pygame.init()
+
     pygame.display.set_caption("Testing the display only")
 
     done = False
     clock = pygame.time.Clock()
 
-    my_display = Display(NATIVE_WIDTH, NATIVE_HEIGHT, screen)
-
-    dx, dy = 0, 0
+    my_display = Display(NATIVE_WIDTH, NATIVE_HEIGHT)
 
     # Main display loop
     while not done:
@@ -179,7 +179,7 @@ def main():
                 # p.set_color(GREEN)
                 p.clear()
 
-        screen.fill(BLACK)
+        my_display.get_screen().fill(BLACK)
 
         my_display.draw_all()
 
@@ -190,4 +190,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    display_test()

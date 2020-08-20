@@ -1,18 +1,12 @@
 from enum import Enum, auto
 import random
-import sys
+import time
+
+from display import *
 
 
 MEM_SIZE = 4096
 PGM_MEM_START = 0x200
-
-NATIVE_WIDTH = 64
-NATIVE_HEIGHT = 32
-ASF = 10    # Arbitrary scale factor for pixels
-
-BG_RED = 0x88
-BG_GREEN = 0x88
-BG_BLUE = 0x88
 
 
 # Holds the names of all the operations
@@ -177,7 +171,7 @@ class CPU:
         # For debugging
         self.debug = debug
 
-    def cycle(self, memory):
+    def cycle(self, memory, display):
 
         opcode = memory.read16(self.pc)
 
@@ -207,8 +201,7 @@ class CPU:
             trace_args = nnn_t
 
         elif self.op == Op.CLS:
-            # TODO: clear screen
-            pass
+            display.clear()
 
         elif self.op == Op.RET:
             # return from subroutine
@@ -318,7 +311,14 @@ class CPU:
             self.v[x] = random.randrange(0, CPU.BYTE_MAX_VALUE + 1, 1) & kk
             trace_args = xkk_t
 
-        elif self.op == Op.DRW: pass # TODO: draw sprite
+        elif self.op == Op.DRW:
+            # read n bytes from address in I
+            sprite = []
+            for i in range(n):
+                sprite.append(memory.read8(self.i + i))
+            # set register VF to the result of the draw_sprite function
+            self.v[CPU.O] = display.draw_sprite(x, y, sprite)
+
         elif self.op == Op.SKP: pass # TODO: skip inst if key pressed
         elif self.op == Op.SKNP: pass # TODO: skip inst if key not pressed
         elif self.op == Op.LDDT:
@@ -378,6 +378,13 @@ class CPU:
         self.pc = next_pc
         return True
 
+    def tick60(self):
+        if self.st > 0:
+            self.st -= 1
+
+        if self.dt > 0:
+            self.dt -= 1
+
     # turns value into a 3-byte BCD representation
     @staticmethod
     def bcd(value):
@@ -398,7 +405,8 @@ class CHIP8:
         self.mem = Memory(0)
         self.debug_mode = debug_mode
         self.stack_size = 16
-        # self.display = Display(NATIVE_WIDTH, NATIVE_HEIGHT, ASF)
+        self.display = Display(NATIVE_WIDTH, NATIVE_HEIGHT)
+        self.cpu = CPU(self.stack_size, debug=self.debug_mode)
 
     def load_rom(self, path):
         with open(path, "rb") as rom_file:
@@ -410,18 +418,39 @@ class CHIP8:
             self.mem.write8(PGM_MEM_START + i, rom_data[i])
 
     def play(self):
-        print("<addr>: <opcode> <op> <args...>")
-        cpu = CPU(self.stack_size, debug=self.debug_mode)
+        if self.debug_mode: print("<addr>: <opcode> <op> <args...>")
         go = True
+
+        old_time = time.time()
+
         while go:
-            go = cpu.cycle(self.mem)
+            go = self.cpu.cycle(self.mem, self.display)
+
+            cur_time = time.time()
+            if cur_time - old_time >= (1/60):
+                old_time = cur_time
+
+                # process inputs
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        go = False
+
+                # Run the 60 Hz tick actions
+                self.cpu.tick60()
+                self.display.draw_all()
+                pygame.display.flip()
+
+        pygame.quit()
 
 
-def main(args):
+def main(rom):
     print("*** CHIP-8 EMULATOR ***")
 
+    pygame.init()
+    pygame.display.set_caption("CHIP-8 EMULATOR")
+
     chip8 = CHIP8(debug_mode=True)
-    chip8.load_rom(args[0])
+    chip8.load_rom(rom)
     chip8.play()
 
     print("THANK YOU FOR USING CHIP-8")
@@ -429,4 +458,5 @@ def main(args):
 
 if __name__ == "__main__":
     # First argument should be the path to the ROM to be played
-    main(sys.argv[1:])
+    rom_name = sys.argv[1]
+    main(rom_name)
